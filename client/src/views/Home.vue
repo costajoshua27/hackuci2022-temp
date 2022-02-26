@@ -31,6 +31,9 @@ export default defineComponent({
       socket.value.on('connect', function() {
         console.log('Socket connected!')
       })
+      socket.value.on("transcriptionProcessed", function(data) {
+        console.log(data)
+      })
     }
 
     onMounted(() => {

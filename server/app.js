@@ -36,16 +36,65 @@ app.get('/', (req, res) => {
 io.on('connect', function(socket) {
   socket.on('transcription', async function({ transcription }) {
     console.log(transcription);
-    const [result] = await client.analyzeSentiment({ document: {
+    const [resultEntities] = await client.analyzeEntities({  document: {
       content: transcription,
       type: 'PLAIN_TEXT'
     }});
-    const sentiment = result.documentSentiment;
-    console.log(`Text: ${transcription}`);
-    console.log(`Sentiment score: ${sentiment.score}`);
-    console.log(`Sentiment magnitude: ${sentiment.magnitude}`);
+    const [resultSentiment] = await client.analyzeSentiment({ document: {
+      content: transcription,
+      type: 'PLAIN_TEXT'
+    }});
+    /*
+    {transcription: string,
+    sound?: string,
+    sentiment: number,
+    entities: Array<entities>}
+    */
+    // Analyze result (what type of sound byte, entities)
+    const sentiment = resultSentiment.documentSentiment;
+    const sentimentScore = sentiment.score;
+    const soundClip = determineSoundClip(sentimentScore);
+    // if we want just the name of the entity
+    const entities = resultEntities.entities.map((currEntity) => {
+      return {
+        name: currEntity.name,
+        type: currEntity.type,
+        salience: currEntity.salience
+      };
+    });
+
+    console.log(entities);
+    console.log(soundClip);
+    console.log(sentimentScore);
+    console.log(transcription);
+
+    socket.emit("transcriptionProcessed", {
+      transcription: transcription,
+      sound: soundClip,
+      sentiment: sentimentScore,
+      entities: entities
+    });
   });
 });
+
+// HELPER METHODS
+function determineSoundClip(sentimentScore) {
+  if (sentimentScore === 0) {
+    return 'neutral';
+  }
+  else if (sentimentScore >= -0.5 && sentimentScore < 0) {
+    return 'negative';
+  }
+  else if (sentimentScore < -0.5) {
+    return 'strongNegative';
+  }
+  else if (sentimentScore > 0 && sentimentScore <= 0.5) {
+    return 'positive';
+  }
+  else {
+    return 'strongPositive';
+  }
+}
 
 // LISTEN
 server.listen(
