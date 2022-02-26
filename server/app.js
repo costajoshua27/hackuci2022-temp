@@ -4,6 +4,7 @@ const cors = require('cors');
 
 const { Server } = require('socket.io');
 const language = require('@google-cloud/language');
+const { getAudioFileForTranscription } = require('./helpers');
 
 // SETUP GOOGLE CLOUD NATURAL LANGUAGE API CLIENT
 const client = new language.LanguageServiceClient();
@@ -28,8 +29,18 @@ const io = new Server(server, {
 });
 
 // DEFINE ROUTES
-app.get('/', (req, res) => {
-  return res.status(200).send('yuh');
+app.post('/video/create', (req, res) => {
+  const data = req.data;
+
+  const images = [];
+  
+  
+
+
+  return res.status(200).json({
+    videoLink: '',
+    status: 'success'
+  });
 });
 
 // DEFINE SOCKET EVENT LISTENERS

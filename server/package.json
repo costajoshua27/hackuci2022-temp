@@ -6,9 +6,11 @@
   },
   "dependencies": {
     "@google-cloud/language": "^4.3.2",
+    "@google-cloud/text-to-speech": "^3.4.0",
     "cors": "^2.8.5",
     "express": "~4.16.1",
     "http-errors": "~1.6.3",
-    "socket.io": "^4.4.1"
+    "socket.io": "^4.4.1",
+    "videoshow": "^0.1.12"
   }
 }
