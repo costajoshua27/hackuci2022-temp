@@ -7,6 +7,7 @@
   "dependencies": {
     "@google-cloud/language": "^4.3.2",
     "@google-cloud/text-to-speech": "^3.4.0",
+    "audioconcat": "^0.1.4",
     "cors": "^2.8.5",
     "express": "~4.16.1",
     "http-errors": "~1.6.3",
