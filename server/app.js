@@ -68,7 +68,6 @@ app.post('/video/create', async (req, res) => {
 // DEFINE SOCKET EVENT LISTENERS
 io.on('connect', function(socket) {
   socket.on('transcription', async function({ sessionId, transcription }) {
-    sessionId = 'DUMMYSESSION';
     console.log(`Session id: ${sessionId}`);
     console.log(`Getting information about:\n${transcription}...`);
 
@@ -113,7 +112,7 @@ io.on('connect', function(socket) {
         : './sound_effects/' + soundFileName
     };
 
-    await getStockImageForTranscription(entities, sessionId, currSession.length + 1);
+    // await getStockImageForTranscription(entities, sessionId, currSession.length + 1);
 
     currSession.push(transcriptionData);
   });

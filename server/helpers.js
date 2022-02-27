@@ -72,7 +72,7 @@ module.exports = {
     const request = {
       input: { text: transcription },
       voice: { languageCode: 'en-US', ssmlGender: 'NEUTRAL' },
-      audioConfig: { audioEncoding: 'MP3' }
+      audioConfig: { audioEncoding: 'MP3', speakingRate: 0.8 }
     };
 
     const [response] = await client.synthesizeSpeech(request);
@@ -145,6 +145,9 @@ module.exports = {
         })
         .on('error', function (err) {
           reject(new Error(err));
+        })
+        .on('stderr', function(stderr) {
+          console.log(`Error: ${stderr}`)
         })
         .on('end', function (output) {
           console.log('Audio created in:', output);
