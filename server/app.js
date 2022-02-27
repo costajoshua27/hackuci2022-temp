@@ -51,10 +51,6 @@ app.post('/video/create', async (req, res) => {
 
   const transcriptData = session.get(sessionId);
 
-  // get images
-  await getStockImageForTranscription(transcription);
-
-
   // get audio times
 
   await createMasterAudio(transcriptData, sessionId);
