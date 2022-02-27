@@ -11,6 +11,9 @@ export default createStore({
   getters: {
   },
   mutations: {
+    setTranscriptions(state, transcriptions) {
+      state.transcriptions = transcriptions
+    },
     setRecording(state, recording) {
       state.recording = recording
     },

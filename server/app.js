@@ -11,7 +11,8 @@ const {
   createMasterAudio,
   getStockImageForTranscription,
   createVideo,
-  deleteFiles
+  deleteFiles,
+  resizeAllPhotos
 } = require('./helpers');
 
 // SETUP SESSION MAP
@@ -26,6 +27,8 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
+
+app.use(express.static('public'));
 
 // CREATE THE SERVER
 const server = createServer(app);
@@ -82,11 +85,10 @@ app.post('/video/create', async (req, res) => {
       fileNum++;
     }
 
-    console.log('finished')
+    // RESIZE THE PHOTOS TO THE SAME SIZE
+    await resizeAllPhotos(imgFiles);
 
-    await createVideo(imgFiles, audioTimes, masterAudioPath, sessionId);
-
-    console.log('finished 2')
+    await createVideo(imgFiles, audioTimes, transcriptData, masterAudioPath, sessionId);
 
     // CLEANUP
     session.delete(sessionId);
@@ -139,11 +141,12 @@ io.on('connect', function(socket) {
 
     const currSession = session.get(sessionId);
     const audioFileName = await getAudioFileForTranscription(transcription, sessionId, currSession.length + 1);
-    const soundFileName = determineSoundFile(sentimentScore);
+    const { sentimentCategory, soundFileName } = determineSoundFile(sentimentScore);
 
     // CLIENT SHOULD PLAY THE SOUND
     socket.emit('playSound', {
-      soundFile: soundFileName 
+      soundFile: soundFileName,
+      sentiment: sentimentCategory 
     });
 
     const transcriptionData = {

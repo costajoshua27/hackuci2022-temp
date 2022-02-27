@@ -63,13 +63,19 @@ module.exports = {
 
     // If neutral, don't play a sound
     if (sentiment === 'neutral') {
-      return null;
+      return {
+        soundFileName: null,
+        sentimentCategory: sentiment
+      };
     }
    
     // Play the appropriate sound
     const soundOptions = soundClips[sentiment];
     const randIndex = Math.floor(Math.random() * soundOptions.length);
-    return soundOptions[randIndex];
+    return {
+      sentimentCategory: sentiment,
+      soundFileName: soundOptions[randIndex]
+    };
   },
   async getAudioFileForTranscription(transcription, sessionId, n) {
     const textToSpeech = require('@google-cloud/text-to-speech');
@@ -78,7 +84,7 @@ module.exports = {
     const request = {
       input: { text: transcription },
       voice: { languageCode: 'en-AU', name: 'en-AU-Wavenet-B', ssmlGender: 'MALE' },
-      audioConfig: { audioEncoding: 'MP3', speakingRate: 0.9 }
+      audioConfig: { audioEncoding: 'MP3' }
     };
 
     const [response] = await client.synthesizeSpeech(request);
@@ -97,10 +103,7 @@ module.exports = {
     const fs = require('fs');
     const buffer = fs.readFileSync(filepath);
     const duration = getMP3Duration(buffer);
-
-    console.log(duration);
-    
-    return duration;
+    return Math.ceil(duration / 1000);
   },
   getStockImageForTranscription(transcriptData, sessionId, n) {
     return new Promise(async (resolve, reject) => {
@@ -134,7 +137,7 @@ module.exports = {
 
         const path = require('path')
 
-        const validExts = new Set(['.jpg', '.jpeg', '.png', '.jfif']);
+        const validExts = new Set(['.jpg', '.jpeg']);
         const validURLs = [];
 
         for (const img of response.data.value) {
@@ -165,6 +168,7 @@ module.exports = {
           } 
         }
 
+        console.log(`Successfully downloaded ${filepath}`);
         resolve(`./tmp/images/${sessionId}-${n}${path.extname(filepath)}`);
 
       } catch(err) {
@@ -196,37 +200,35 @@ module.exports = {
         .on('error', function (err) {
           reject(new Error(err));
         })
-        .on('stderr', function(stderr) {
-          console.log(`Error: ${stderr}`)
-        })
         .on('end', function (output) {
           console.log('Audio created in:', output);
           resolve();
         });
     });
   },
-  createVideo(imgFiles, audioTimes, masterAudioPath, sessionId) {
+  createVideo(imgFiles, audioTimes, transcriptData, masterAudioPath, sessionId) {
     const videoshow = require('videoshow');
 
     let videoSlides = [];
     for (let i = 0; i < audioTimes.length; i++) {
       videoSlides.push({
-        path: imgFiles[i],
-        loop: audioTimes[i]
+        path: imgFiles[i] + '.jpeg',
+        caption: transcriptData[i].transcription,
+        loop: audioTimes[i],
+        transition: false,
+        transitionDuration: 0,
+        captionDelay: 0
       });
     }
 
-    console.log(videoSlides);
-    console.log(masterAudioPath, sessionId);
-
     return new Promise((resolve, reject) => {
-      resolve();
-    })
-  
-    return new Promise((resolve, reject) => {
-      videoshow(videoSlides)
+      videoshow(videoSlides, {
+        size: '1000x1000',
+        captionDelay: 0,
+        transition: false
+      })
         .audio(masterAudioPath)
-        .save(`./videos/${sessionId}-video.mp4`)
+        .save(`./public/${sessionId}-video.mp4`)
         .on('start', function (command) {
           console.log('ffmpeg process started:', command)
         })
@@ -265,5 +267,30 @@ module.exports = {
         }
       }
     });
+  },
+  resizeAllPhotos(imgFiles) {
+    return new Promise(async (resolve, reject) => {
+      const sharp = require('sharp');
+      const fs = require('fs');
+
+      try {
+
+        for (const img of imgFiles) {
+          console.log(img);
+          const data = await sharp(img)
+            .resize(1000, 1000)
+            .jpeg()
+            .toBuffer();
+          console.log(data);
+          fs.writeFileSync(img + '.jpeg', data);
+          console.log('Resized ' + img);
+        }
+
+        resolve();
+
+      } catch (err) {
+        reject(new Error(err));
+      }
+    })
   }
 };

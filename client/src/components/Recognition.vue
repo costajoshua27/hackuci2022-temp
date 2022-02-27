@@ -5,7 +5,7 @@
 </template>
 
 <script>
-import { defineComponent, ref, computed, onMounted, onUnmounted } from 'vue'
+import { defineComponent, ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useStore } from 'vuex'
 
 export default defineComponent({
@@ -122,7 +122,10 @@ export default defineComponent({
 
     onMounted(async () => {
       await setupMediaDevices()
-      setupTranscription()
+
+      watch(() => store.state.recording, value => {
+        if (value) setupTranscription()
+      })
     })
 
     onUnmounted(() => {
