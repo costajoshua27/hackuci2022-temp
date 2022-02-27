@@ -7,7 +7,8 @@ const language = require('@google-cloud/language');
 const { 
   getAudioFileForTranscription,
   determineSoundFile,
-  createMasterAudio
+  createMasterAudio,
+  getStockImageForTranscription
 } = require('./helpers');
 
 // SETUP SESSION MAP
@@ -50,6 +51,12 @@ app.post('/video/create', async (req, res) => {
 
   const transcriptData = session.get(sessionId);
 
+  // get images
+  await getStockImageForTranscription(transcription);
+
+
+  // get audio times
+
   await createMasterAudio(transcriptData, sessionId);
 
   // CLEANUP
@@ -65,6 +72,7 @@ app.post('/video/create', async (req, res) => {
 // DEFINE SOCKET EVENT LISTENERS
 io.on('connect', function(socket) {
   socket.on('transcription', async function({ sessionId, transcription }) {
+    sessionId = 'DUMMYSESSION';
     console.log(`Session id: ${sessionId}`);
     console.log(`Getting information about:\n${transcription}...`);
 
@@ -87,9 +95,6 @@ io.on('connect', function(socket) {
       };
     });
 
-    console.log(entities);
-    console.log(sentimentScore);
-
     // INITIALIZE THE SESSION IF IT HASN'T YET
     if (!session.get(sessionId)) { 
       session.set(sessionId, []);
@@ -111,6 +116,8 @@ io.on('connect', function(socket) {
         ? null 
         : './sound_effects/' + soundFileName
     };
+
+    await getStockImageForTranscription(entities, sessionId, currSession.length + 1);
 
     currSession.push(transcriptionData);
   });
