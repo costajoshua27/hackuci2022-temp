@@ -7,8 +7,11 @@ const language = require('@google-cloud/language');
 const { 
   getAudioFileForTranscription,
   determineSoundFile,
+  getAudioTimes,
   createMasterAudio,
-  getStockImageForTranscription
+  getStockImageForTranscription,
+  createVideo,
+  deleteFiles
 } = require('./helpers');
 
 // SETUP SESSION MAP
@@ -49,20 +52,59 @@ app.post('/video/create', async (req, res) => {
     });
   }
 
-  const transcriptData = session.get(sessionId);
+  try {
+    // Array of currData
+    const transcriptData = session.get(sessionId);
 
-  // get audio times
+    // get audio times (should be same lenght as transcriptData)
+    const audioTimes = [];
+    for (const data of transcriptData) {
+      let currTime = 0;
+      currTime += getAudioTimes(data.audioFile);
+      if (data.soundFile) {
+        currTime += getAudioTimes(data.soundFile);
+      }
+      audioTimes.push(currTime);
+    }
 
-  await createMasterAudio(transcriptData, sessionId);
+    console.log(audioTimes);
 
-  // CLEANUP
-  session.delete(sessionId);
-  // delete files
+    // CREATE THE MASTER AUDIO
+    await createMasterAudio(transcriptData, sessionId);
+    let masterAudioPath = `./tmp/${sessionId}-master.mp3`;
 
-  return res.status(200).json({
-    videoLink: '',
-    status: 'success'
-  });
+    // GET THE IMAGES
+    const imgFiles = [];
+    let fileNum = 1;
+    for (const data of transcriptData) {
+      const file = await getStockImageForTranscription(data, sessionId, fileNum);
+      imgFiles.push(file);
+      fileNum++;
+    }
+
+    console.log('finished')
+
+    await createVideo(imgFiles, audioTimes, masterAudioPath, sessionId);
+
+    console.log('finished 2')
+
+    // CLEANUP
+    session.delete(sessionId);
+    // DELETE FILES;
+    deleteFiles(`./tmp/${sessionId}*`);
+    deleteFiles(`./tmp/images/${sessionId}*`);
+
+    // RETURN RESPONSE;
+    return res.status(200).json({
+      videoLink: `http://localhost:3000/${sessionId}-video.mp4`,
+      status: 'success'
+    });
+  } catch(err) {
+    return res.status(400).json({
+      status: 'failure',
+      reason: 'Failure in creating video'
+    });
+  }
 });
 
 // DEFINE SOCKET EVENT LISTENERS
@@ -106,13 +148,12 @@ io.on('connect', function(socket) {
 
     const transcriptionData = {
       transcription,
+      entities,
       audioFile: audioFileName,
       soundFile: soundFileName === null
         ? null 
         : './sound_effects/' + soundFileName
     };
-
-    // await getStockImageForTranscription(entities, sessionId, currSession.length + 1);
 
     currSession.push(transcriptionData);
   });

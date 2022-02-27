@@ -11,6 +11,8 @@
     "axios": "^0.26.0",
     "cors": "^2.8.5",
     "express": "~4.16.1",
+    "get-mp3-duration": "^1.0.0",
+    "glob": "^7.2.0",
     "http-errors": "~1.6.3",
     "image-downloader": "^4.1.0",
     "socket.io": "^4.4.1",

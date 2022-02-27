@@ -1,21 +1,27 @@
 function getFilePath(sessionId, n, url) {
-  console.log()
   const urlSplit = url.split('.');
   const fileFormatRaw = urlSplit[urlSplit.length - 1];
   const fileFormat = fileFormatRaw.indexOf('?') > 0 ? fileFormatRaw.substring(0, fileFormatRaw.indexOf('?')) : fileFormatRaw;
-  console.log(fileFormat);
   return `../../tmp/images/${sessionId}-${n}.${fileFormat}`;
 }
 
-function downloadImage(url, filepath) {
-  console.log(filepath);
-  console.log(url);
-  const imageDownloader = require('image-downloader');
-  return imageDownloader.image({
-    url,
-    dest: filepath
-  });
-}
+// function downloadImage(validURLs) {
+//   console.log(filepath);
+//   console.log(url);
+//   const imageDownloader = require('image-downloader');
+//   return imageDownloader.image({
+//     url,
+//     dest: filepath
+//   })
+//   .then(({ filename }) => {
+//     console.log('Saved to', filename)  // saved to /path/to/dest/photo.jpg
+//   })
+//   .catch((err) => {
+//     console.log('here?');
+//     console.error(err);
+    
+//   });
+// }
 
 module.exports = {
   determineSoundFile(sentimentScore) {
@@ -71,8 +77,8 @@ module.exports = {
 
     const request = {
       input: { text: transcription },
-      voice: { languageCode: 'en-US', ssmlGender: 'NEUTRAL' },
-      audioConfig: { audioEncoding: 'MP3', speakingRate: 0.8 }
+      voice: { languageCode: 'en-AU', name: 'en-AU-Wavenet-B', ssmlGender: 'MALE' },
+      audioConfig: { audioEncoding: 'MP3', speakingRate: 0.9 }
     };
 
     const [response] = await client.synthesizeSpeech(request);
@@ -86,43 +92,87 @@ module.exports = {
 
     return filename;
   },
-  async getStockImageForTranscription(entities, sessionId, n) {
-    // make sure we get the right stock images
-    // store the images in ./tmp/images/${sessionId}.{format}
+  getAudioTimes(filepath) {
+    const getMP3Duration = require('get-mp3-duration');
+    const fs = require('fs');
+    const buffer = fs.readFileSync(filepath);
+    const duration = getMP3Duration(buffer);
 
-    //https://www.google.com/search?q=friend&hl=EN&tbm=isch
-    entities.sort((a,b) => {
-      b.salience - a.salience;
-    });
-    const axios = require("axios").default;
-    const entityNames = entities.map(entity => entity.name).join(' ');
-
-    var options = {
-      method: 'GET',
-      url: 'https://contextualwebsearch-websearch-v1.p.rapidapi.com/api/Search/ImageSearchAPI',
-      params: {q: entityNames, pageNumber: '1', pageSize: '10', autoCorrect: 'true'},
-      headers: {
-        'x-rapidapi-host': 'contextualwebsearch-websearch-v1.p.rapidapi.com',
-        'x-rapidapi-key': process.env.CONTEXTUALWEBSEARCHAPI
-      }
-    };
-
-    axios.request(options).then(function (response) {
-      console.log(response.data);
-
-      // get url of first image from results
-      const imgURL = response
-        .data
-        .value[0]
-        .url;
-      const filepath = getFilePath(sessionId, n, imgURL);
-
-      // download url
-      downloadImage(imgURL, filepath);
-    }).catch(function (error) {
-      console.error(error);
-    });
+    console.log(duration);
     
+    return duration;
+  },
+  getStockImageForTranscription(transcriptData, sessionId, n) {
+    return new Promise(async (resolve, reject) => {
+      const entities = transcriptData.entities;
+      const transcription = transcriptData.transcription;
+      let searchContent;
+
+      if (entities.length > 0) {
+        entities.sort((a,b) => {
+          b.salience - a.salience;
+        });
+        searchContent = entities.map(entity => entity.name).join(' ');
+      } else {
+        searchContent = transcription;
+      }
+
+      const axios = require("axios").default;
+
+      const options = {
+        method: 'GET',
+        url: 'https://contextualwebsearch-websearch-v1.p.rapidapi.com/api/Search/ImageSearchAPI',
+        params: { q: searchContent, pageNumber: '1', pageSize: '10', autoCorrect: 'true' },
+        headers: {
+          'x-rapidapi-host': 'contextualwebsearch-websearch-v1.p.rapidapi.com',
+          'x-rapidapi-key': process.env.CONTEXTUALWEBSEARCHAPI
+        }
+      };
+
+      try {
+        const response = await axios.request(options);
+
+        const path = require('path')
+
+        const validExts = new Set(['.jpg', '.jpeg', '.png', '.jfif']);
+        const validURLs = [];
+
+        for (const img of response.data.value) {
+          const imgURL = img.url;
+          const filepath = getFilePath(sessionId, n, imgURL);
+          if (filepath && validExts.has(path.extname(filepath))) {
+            validURLs.push({'imgURL': imgURL, 'filepath': filepath});
+          }
+        }
+
+        let filepath;
+        const imageDownloader = require('image-downloader');
+
+        for (const validURL of validURLs) {
+          const url = validURL['imgURL'];
+          filepath = validURL['filepath'];
+
+          try {
+            console.log('trying ' + filepath + '(' + url + ')')
+            await imageDownloader.image({
+              url,
+              dest: filepath
+            });
+            break;
+          } catch(err) {
+            console.error(err);
+            continue;
+          } 
+        }
+
+        resolve(`./tmp/images/${sessionId}-${n}${path.extname(filepath)}`);
+
+      } catch(err) {
+        console.log('NOT HERE PLEASE');
+        console.error(err);
+        reject(new Error(err));        
+      }
+    });
   },
   createMasterAudio(transcriptData, sessionId) {
     const audioconcat = require('audioconcat');
@@ -153,6 +203,67 @@ module.exports = {
           console.log('Audio created in:', output);
           resolve();
         });
+    });
+  },
+  createVideo(imgFiles, audioTimes, masterAudioPath, sessionId) {
+    const videoshow = require('videoshow');
+
+    let videoSlides = [];
+    for (let i = 0; i < audioTimes.length; i++) {
+      videoSlides.push({
+        path: imgFiles[i],
+        loop: audioTimes[i]
+      });
+    }
+
+    console.log(videoSlides);
+    console.log(masterAudioPath, sessionId);
+
+    return new Promise((resolve, reject) => {
+      resolve();
+    })
+  
+    return new Promise((resolve, reject) => {
+      videoshow(videoSlides)
+        .audio(masterAudioPath)
+        .save(`./videos/${sessionId}-video.mp4`)
+        .on('start', function (command) {
+          console.log('ffmpeg process started:', command)
+        })
+        .on('error', function (err, stdout, stderr) {
+          console.error('Error:', err)
+          console.error('ffmpeg stderr:', stderr)
+          reject();
+        })
+        .on('end', function () {
+          console.log('done creating videoshow');
+          resolve();
+        });
+    });
+  },
+  deleteFiles(filepath) {
+    const fs = require('fs');
+    const glob = require('glob');
+    let tmpFiles;
+    glob(filepath, (err, res) => {
+      if (err) {
+        console.log('Error', err);
+      } else {
+        tmpFiles = res;
+  
+        if (tmpFiles) {
+          tmpFiles.forEach(path => {
+            console.log(path);
+            console.log(typeof(path));
+            try {
+              fs.unlinkSync(path);
+              console.log(`deleted: ${path}`);
+            } catch(err) {
+              console.log(err);
+            }
+          });
+        }
+      }
     });
   }
 };
