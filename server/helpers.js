@@ -1,12 +1,24 @@
 module.exports = {
   determineSoundFile(sentimentScore) {
     const soundClips = {
-      strongNegative: ['GaspV2.mp3'],
-      negative: ['GaspV1.mp3', 'SadAww.mp3'],
-      positive:['Impressed_Ooh.mp3', 'LaughV2.mp3'],
-      strongPositive: ['Celebrity_Intro.mp3', 'Intrigued_Ooh.mp3']
+      strongNegative: [
+        'strong_negative_1.mp3'
+      ],
+      negative: [
+        'negative_1.mp3',
+        'negative_2.mp3'
+      ],
+      positive:[
+        'positive_1.mp3', 
+        'positive_2.mp3'
+      ],
+      strongPositive: [
+        'strong_positive_1.mp3', 
+        'strong_positive_2.mp3'
+      ]
     };
 
+    // Figure out the threshold
     let sentiment;
     if (sentimentScore > -0.2 && sentimentScore < 0.2) {
       sentiment = 'neutral';
@@ -24,15 +36,14 @@ module.exports = {
       sentiment = 'strongPositive';
     }
 
+    // If neutral, don't play a sound
     if (sentiment === 'neutral') {
       return null;
     }
-    
-    let soundOptions = soundClips[sentiment];
-    console.log(sentimentScore);
-    console.log(soundOptions);
-    let randIndex = Math.floor(Math.random()*soundOptions.length);
-    console.log(soundOptions[randIndex]);
+   
+    // Play the appropriate sound
+    const soundOptions = soundClips[sentiment];
+    const randIndex = Math.floor(Math.random() * soundOptions.length);
     return soundOptions[randIndex];
   },
   async getAudioFileForTranscription(transcription, sessionId, n) {
@@ -49,7 +60,7 @@ module.exports = {
 
     const fs = require('fs');
     const util = require('util');
-    const filename = require(`./tmp/${sessionId}-${n}.mp3`);
+    const filename = `./tmp/${sessionId}-${n}.mp3`;
 
     const writeFile = util.promisify(fs.writeFile);
     await writeFile(filename, response.audioContent, 'binary');
@@ -70,9 +81,11 @@ module.exports = {
       }
     }
 
+    console.log(audioFiles);
+
     return new Promise((resolve, reject) => {
       audioconcat(audioFiles)
-        .concat(`./tmp/${sessionId}.mp3`)
+        .concat(`./tmp/${sessionId}-master.mp3`)
         .on('start', function (command) {
           console.log('ffmpeg process started:', command);
         })

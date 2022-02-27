@@ -39,7 +39,14 @@ const io = new Server(server, {
 app.post('/video/create', async (req, res) => {
   const {
     sessionId
-  } = req.data;
+  } = req.body;
+
+  if (!session.get(sessionId)) {
+    return res.status(400).json({
+      status: 'failure',
+      reason: 'Session does not exist'
+    });
+  }
 
   const transcriptData = session.get(sessionId);
 
@@ -81,7 +88,6 @@ io.on('connect', function(socket) {
     });
 
     console.log(entities);
-    console.log(soundClip);
     console.log(sentimentScore);
 
     // INITIALIZE THE SESSION IF IT HASN'T YET
@@ -90,7 +96,7 @@ io.on('connect', function(socket) {
     }
 
     const currSession = session.get(sessionId);
-    const audioFileName = getAudioFileForTranscription(transcription, sessionId, currSession.length + 1);
+    const audioFileName = await getAudioFileForTranscription(transcription, sessionId, currSession.length + 1);
     const soundFileName = determineSoundFile(sentimentScore);
 
     // CLIENT SHOULD PLAY THE SOUND
@@ -101,7 +107,9 @@ io.on('connect', function(socket) {
     const transcriptionData = {
       transcription,
       audioFile: audioFileName,
-      soundFile: soundFileName
+      soundFile: soundFileName === null
+        ? null 
+        : './sound_effects/' + soundFileName
     };
 
     currSession.push(transcriptionData);

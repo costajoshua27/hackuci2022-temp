@@ -5,7 +5,7 @@
 </template>
 
 <script>
-import { defineComponent, ref, computed, onMounted } from 'vue'
+import { defineComponent, ref, computed, onMounted, onUnmounted } from 'vue'
 import { useStore } from 'vuex'
 
 export default defineComponent({
@@ -16,9 +16,12 @@ export default defineComponent({
 
     const myStream = computed(() => store.state.myStream)
     const socket = computed(() => store.state.socket)
+    const sessionId = computed(() => store.state.sessionId)
 
     const recognition = ref(null)
     const needToRestart = ref(false)
+
+    const requestID = ref(-1)
 
     const setupMediaDevices = async function() {
       try {
@@ -55,6 +58,11 @@ export default defineComponent({
 
       recognition.value.onresult = function(event) {
         needToRestart.value = true
+
+        if (!sessionId.value) {
+          return
+        }
+
         console.log('Got a result!')
         const transcription = event
           .results[event.results.length - 1][0]
@@ -62,6 +70,7 @@ export default defineComponent({
         store.state.transcriptions.push(transcription)
         if (socket.value) {
           socket.value.emit('transcription', {
+            sessionId: sessionId.value,
             transcription
           })
         }
@@ -92,7 +101,7 @@ export default defineComponent({
       let triggered = false
 
       const checkAudioSilence = function() {
-        requestAnimationFrame(checkAudioSilence)
+        requestID.value = requestAnimationFrame(checkAudioSilence)
         audioAnalyser.getByteFrequencyData(data)
         if (data.some(v => v)) {
           if (triggered) {
@@ -114,6 +123,12 @@ export default defineComponent({
     onMounted(async () => {
       await setupMediaDevices()
       setupTranscription()
+    })
+
+    onUnmounted(() => {
+      if (recognition.value) recognition.value.stop()
+      cancelAnimationFrame(requestID.value)
+      console.log('Removed recognition...')
     })
   }
 })
